@@ -1,0 +1,62 @@
+<p>As seen in the Project 2 spec, instead of using packet headers with predefined byte boundaries, we&rsquo;ll be using Type-Length-Value (TLV) encoding for the security messages. TLV can be a bit tricky to work with, so we&rsquo;re providing some TLV helpers in the<span>&nbsp;</span><code>consts.h</code><span>&nbsp;</span>file found in the starter code.</p>
+<h1 id="using-securityc" class="anchor">Using<span>&nbsp;</span><code>security.c</code></h1>
+<p>Before going into how to use the TLV helpers, it&rsquo;s important to know how the programming model in<span>&nbsp;</span><code>security.c</code><span>&nbsp;</span>works.</p>
+<p>In Project 1, we implemented a reliable data transfer protocol. Our &ldquo;upper layer&rdquo; was standard input and standard output. We interfaced with<span>&nbsp;</span><code>stdin</code><span>&nbsp;</span>and<span>&nbsp;</span><code>stdout</code><span>&nbsp;</span>using the functions provided in<span>&nbsp;</span><code>io.h</code>.</p>
+<p>In Project 2, our &ldquo;upper layer&rdquo; is our security layer. You&rsquo;ll see that the functions in<span>&nbsp;</span><code>security.h</code><span>&nbsp;</span>are similar to the functions in<span>&nbsp;</span><code>io.h</code>. This allows us to &ldquo;hot swap&rdquo; our layers very easily when transitioning from Project 1 to Project 2. (I encourage you to take a look at the difference between<span>&nbsp;</span><code>server.c</code>/<code>client.c</code><span>&nbsp;</span>in the Project 1 and Project 2 starter code. There&rsquo;s barely any difference!)</p>
+<p>The starter code as-is functions as a Project 1 solution since we pass our data directly to the<span>&nbsp;</span><code>io</code><span>&nbsp;</span>functions.</p>
+<h2 id="init_sec" class="anchor"><code>init_sec</code></h2>
+<p>Similar to<span>&nbsp;</span><code>init_io</code>, this is where we make preparations before we start interfacing with the upper layer.<span>&nbsp;</span><code>init_sec</code><span>&nbsp;</span>has two parameters:</p>
+<ul>
+    <li><code>int type</code>: Determines whether or not this program is functioning as the server or client.</li>
+    <li><code>char* host</code>: The hostname that was inputted to the program.</li>
+</ul>
+<p>Take these two values and somehow save them for future use.</p>
+<h2 id="input_sec" class="anchor"><code>input_sec</code></h2>
+<p>This function allows you to provide input to the transport layer. The transport layer will call this method when creating new packets. As such, it&rsquo;s guaranteed that any data you write to the<span>&nbsp;</span><code>buf</code><span>&nbsp;</span>argument will all be in one packet (just make sure to not write more than<span>&nbsp;</span><code>max_length</code>, or else you&rsquo;ll get a buffer overflow).</p>
+<p>For example,</p>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>ssize_t</span><span> input_sec</span><span>(</span><span>uint8_t*</span><span> buf</span><span>, </span><span>size_t</span><span> max_length</span><span>) {</span></span>
+<span class="line"><span>    strcpy</span><span>((</span><span>char*</span><span>) buf, </span><span>"Hello!"</span><span>);</span></span>
+
+<span class="line"><span>    return</span><span> strlen</span><span>(</span><span>"Hello!"</span><span>);</span></span>
+<span class="line"><span>}</span></span></code></pre>
+<p>will always send out packets with the payload<span>&nbsp;</span><code>Hello!</code>.</p>
+<h2 id="output_sec" class="anchor"><code>output_sec</code></h2>
+<p>Similar to<span>&nbsp;</span><code>input_sec</code>, the data in<span>&nbsp;</span><code>buf</code><span>&nbsp;</span>corresponds to data from one packet. Each time the transport layer receives a new, in-order packet, it will call this function.</p>
+<h1 id="tlv-examples" class="anchor">TLV Examples</h1>
+<p>Let&rsquo;s go over sending and receiving a (modified)<span>&nbsp;</span><code>Client-Hello</code><span>&nbsp;</span>message using the TLV functions provided in<span>&nbsp;</span><code>consts.h</code>.</p>
+<h2 id="sending" class="anchor">Sending</h2>
+<p>In the<span>&nbsp;</span><code>input_sec</code><span>&nbsp;</span>function, let&rsquo;s create a TLV packet.</p>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>ssize_t</span><span> input_sec</span><span>(</span><span>uint8_t*</span><span> buf</span><span>, </span><span>size_t</span><span> max_length</span><span>) {</span></span>
+<span class="line"><span>    tlv</span><span>*</span><span> ch </span><span>=</span><span> create_tlv</span><span>(CLIENT_HELLO);</span></span>
+</code></pre>
+<p><code>create_tlv</code><span>&nbsp;</span>will<span>&nbsp;</span><em>dynamically</em><span>&nbsp;</span>allocate memory for this TLV object.</p>
+<p>Now, let&rsquo;s place a nonce inside this Client Hello. Firstly, let&rsquo;s create the Nonce TLV object.</p>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>    tlv</span><span>*</span><span> nn </span><span>=</span><span> create_tlv</span><span>(NONCE);</span></span></code></pre>
+<p>Then, generate the nonce using functions from<span>&nbsp;</span><code>libsecurity</code>.</p>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>    uint8_t</span><span> nonce</span><span>[NONCE_SIZE];</span></span>
+<span class="line"><span>    generate_nonce</span><span>(nonce, NONCE_SIZE);</span></span></code></pre>
+<p>We can now place this data inside the Nonce object. This will<span>&nbsp;</span><em>dynamically</em><span>&nbsp;</span>allocate space inside the TLV object and copy it over.</p>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>    add_val</span><span>(nn, nonce, NONCE_SIZE);</span></span></code></pre>
+<p>Let&rsquo;s add this Nonce TLV object as part of the Client Hello.</p>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>    add_tlv</span><span>(ch, nn);</span></span></code></pre>
+<p>We&rsquo;re now ready to send this TLV packet to the transport layer. Let&rsquo;s<span>&nbsp;</span><em>serialize</em><span>&nbsp;</span>the TLV into bytes by writing it directly to the transport layer&rsquo;s buffer (the<span>&nbsp;</span><code>buf</code><span>&nbsp;</span>argument in<span>&nbsp;</span><code>input_sec</code>).</p>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>    uint16_t</span><span> len </span><span>=</span><span> serialize_tlv</span><span>(buf, ch);</span></span></code></pre>
+<p>Since all these TLV objects are<span>&nbsp;</span><em>dynamically</em><span>&nbsp;</span>allocated, we need to free them to conserve memory (this is a toy project, sure, but these are best practices&hellip;)</p>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>    free_tlv</span><span>(ch);</span></span></code></pre>
+<p>This will recursively go through each TLV in the TLV object tree and free the object and its value.<span>&nbsp;</span><strong>It&rsquo;s not recommended for TLV objects to have multiple parents or to be modified after adding a parent. This has undefined behavior.</strong></p>
+<p>To let the transport layer know about the data we&rsquo;ve sent, let&rsquo;s return the length of the data.</p>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>    return</span><span> len;</span></span>
+<span class="line"><span>}</span></span></code></pre>
+<h2 id="receiving" class="anchor">Receiving</h2>
+<p>In the<span>&nbsp;</span><code>output_sec</code><span>&nbsp;</span>function, let&rsquo;s try to deserialize a TLV packet.</p>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>void</span><span> output_sec</span><span>(</span><span>uint8_t*</span><span> buf</span><span>, </span><span>size_t</span><span> length</span><span>) {</span></span>
+<span class="line"><span>    tlv</span><span>*</span><span> ch </span><span>=</span><span> deserialize_tlv</span><span>(buf, length);</span></span></code></pre>
+<p>Make sure that the resulting value is not<span>&nbsp;</span><code>NULL</code>. If it is, that means that the data inside<span>&nbsp;</span><code>buf</code><span>&nbsp;</span>does not represent a valid TLV packet. Feel free to use the<span>&nbsp;</span><code>print_tlv_bytes</code><span>&nbsp;</span>function to print as much of the packet as possible.</p>
+<p><code>deserialize_tlv</code><span>&nbsp;</span>will recursively parse TLV packets. As such, our Nonce TLV object has been parsed already. We can now retrieve it and inspect its contents. (Before this, also make sure that the result from<span>&nbsp;</span><code>get_tlv</code><span>&nbsp;</span>is not<span>&nbsp;</span><code>NULL</code>.)</p>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>    tlv</span><span>*</span><span> nn </span><span>=</span><span> get_tlv</span><span>(ch, NONCE);</span></span>
+<span class="line"><span>    nn</span><span>-&gt;</span><span>length;</span><span> // NONCE_SIZE</span></span>
+<span class="line"><span>    nn</span><span>-&gt;</span><span>val;</span><span> // Contains our random nonce</span></span>
+<span class="line"><span>}</span></span></code></pre>
+<p>Please note that<span>&nbsp;</span><code>get_tlv</code><span>&nbsp;</span>performs a breadth-first search in the TLV object for the requested type. To get the other type within a nested topology, get the intermediate type first. (e.g.<span>&nbsp;</span><code>Server-Hello</code><span>&nbsp;</span>has a top-level signature and another one inside its certificate.)</p>
+<h2 id="debugging" class="anchor">Debugging</h2>
+<p>The<span>&nbsp;</span><code>print_tlv_bytes</code><span>&nbsp;</span>function is very useful to see how TLV packets may be malformed and/or missing fields.</p>
