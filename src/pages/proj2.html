@@ -1,0 +1,134 @@
+<h1 id="overview" class="anchor">Overview</h1>
+<p>For Project 2, we&rsquo;re using OpenSSL 3&rsquo;s<span>&nbsp;</span><code>libcrypto</code><span>&nbsp;</span>for cryptographic primitives. However, directly interfacing with<span>&nbsp;</span><code>libcrypto</code><span>&nbsp;</span>may prove to be quite challenging for a lot of students. As such, we&rsquo;re providing our own<span>&nbsp;</span><code>libsecurity</code><span>&nbsp;</span>that has more course-grained cryptographic primitives that are specific to Project 2.</p>
+<h1 id="global-variables" class="anchor">Global Variables</h1>
+<h2 id="evp_pkey-ec_peer_public_key" class="anchor"><code>EVP_PKEY* ec_peer_public_key</code></h2>
+<p>This variable is populated after a valid call to<span>&nbsp;</span><code>load_peer_public_key</code>. Use this as the<span>&nbsp;</span><code>authority</code><span>&nbsp;</span>for<span>&nbsp;</span><code>verify</code><span>&nbsp;</span>if you&rsquo;d like to check if some data was signed with the peer&rsquo;s (the other client or server) private key.</p>
+<h2 id="evp_pkey-ec_ca_public_key" class="anchor"><code>EVP_PKEY* ec_ca_public_key</code></h2>
+<p>This variable is populated after a valid call to<span>&nbsp;</span><code>load_ca_public_key</code>. Use this as the<span>&nbsp;</span><code>authority</code><span>&nbsp;</span>for<span>&nbsp;</span><code>verify</code><span>&nbsp;</span>if you&rsquo;d like to check if some data was signed with the certificate authority&rsquo;s private key.</p>
+<h2 id="uint8_t-certificate-and-size_t-cert_size" class="anchor"><code>uint8_t* certificate</code><span>&nbsp;</span>and<span>&nbsp;</span><code>size_t cert_size</code></h2>
+<p>This variable is populated after a valid call to<span>&nbsp;</span><code>load_certificate</code>. This certificate is already encoded as TLV 0xA0 (see the<span>&nbsp;</span><a href="https://winter25.cs118.org/projects/project2#server-hello">Project 2 spec</a><span>&nbsp;</span>for more info).<br /><code>cert_size</code><span>&nbsp;</span>is the corresponding total length of the<span>&nbsp;</span><code>certificate</code>.</p>
+<h2 id="uint8_t-public_key-and-size_t-pub_key_size" class="anchor"><code>uint8_t* public_key</code><span>&nbsp;</span>and<span>&nbsp;</span><code>size_t pub_key_size</code></h2>
+<p>This variable is populated after a valid call to<span>&nbsp;</span><code>derive_public_key</code>. This public key is encoded as<span>&nbsp;</span><a href="http://luca.ntop.org/Teaching/Appunti/asn1.html">ASN.1 DER</a>; you do not need to know the specifics about this encoding. This is the format that we use to send public keys over the wire.<br /><code>pub_key_size</code><span>&nbsp;</span>is the corresponding total length of the<span>&nbsp;</span><code>public_key</code>.</p>
+<h1 id="load_private_key" class="anchor"><code>load_private_key</code></h1>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>void</span><span> load_private_key</span><span>(</span><span>const</span><span> char*</span><span> filename</span><span>);</span></span></code></pre>
+<p>From a file on the local file system, load in a private key.</p>
+<h2 id="parameters" class="anchor">Parameters</h2>
+<ul>
+    <li><code>const char* filename</code>: The absolute or relative path to the private key. (Hint: in Project 2, it&rsquo;s just<span>&nbsp;</span><code>server_key.bin</code>.)</li>
+</ul>
+<h1 id="get_private_key" class="anchor"><code>get_private_key</code></h1>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>EVP_PKEY</span><span>*</span><span> get_private_key</span><span>();</span></span></code></pre>
+<p>Retrieve the current private key to potentially restore it later (using<span>&nbsp;</span><code>set_private_key</code>).</p>
+<h2 id="returns" class="anchor">Returns</h2>
+<p>A pointer to the current state of the private key.</p>
+<h1 id="set_private_key" class="anchor"><code>set_private_key</code></h1>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>void</span><span> set_private_key</span><span>(EVP_PKEY</span><span>*</span><span> key</span><span>);</span></span></code></pre>
+<p>Set the private key to some previously known private key state (retrieved using<span>&nbsp;</span><code>get_private_key</code>).</p>
+<h2 id="parameters-1" class="anchor">Parameters</h2>
+<ul>
+    <li><code>EVP_PKEY* key</code>: The previously known private key state.</li>
+</ul>
+<h1 id="load_peer_public_key" class="anchor"><code>load_peer_public_key</code></h1>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>void</span><span> load_peer_public_key</span><span>(</span><span>const</span><span> uint8_t*</span><span> peer_key</span><span>, </span><span>size_t</span><span> size</span><span>);</span></span></code></pre>
+<p>Take some public key sent over the wire and load it as the peer&rsquo;s public key (in<span>&nbsp;</span><code>ec_peer_public_key</code>).</p>
+<h2 id="parameters-2" class="anchor">Parameters</h2>
+<ul>
+    <li><code>const uint8_t* peer_key</code>: ASN.1 encoded public key.</li>
+    <li><code>size_t size</code>: Its corresponding size in bytes.</li>
+</ul>
+<h1 id="load_ca_public_key" class="anchor"><code>load_ca_public_key</code></h1>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>void</span><span> load_ca_public_key</span><span>(</span><span>const</span><span> char*</span><span> filename</span><span>);</span></span></code></pre>
+<p>From a file on the local file system, load in the CA&rsquo;s public key.</p>
+<h2 id="parameters-3" class="anchor">Parameters</h2>
+<ul>
+    <li><code>const char* filename</code>: The absolute or relative path to the CA&rsquo;s public key. (Hint: in Project 2, it&rsquo;s just<span>&nbsp;</span><code>ca_public_key.bin</code>.)</li>
+</ul>
+<h1 id="load_certificate" class="anchor"><code>load_certificate</code></h1>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>void</span><span> load_certificate</span><span>(</span><span>const</span><span> char*</span><span> filename</span><span>);</span></span></code></pre>
+<p>From a file on the local file system, load in your certificate that has been signed by the CA into the<span>&nbsp;</span><code>certificate</code><span>&nbsp;</span>global variable.</p>
+<h2 id="parameters-4" class="anchor">Parameters</h2>
+<ul>
+    <li><code>const char* filename</code>: The absolute or relative path to the certificate. (Hint: in Project 2, it&rsquo;s just<span>&nbsp;</span><code>server_cert.bin</code>.)</li>
+</ul>
+<h1 id="generate_private_key" class="anchor"><code>generate_private_key</code></h1>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>void</span><span> generate_private_key</span><span>();</span></span></code></pre>
+<p>Randomly generate a private key (can be retrieved using<span>&nbsp;</span><code>get_private_key</code>). Make sure to call this (or<span>&nbsp;</span><code>load_private_key</code>/<code>set_private_key</code>) before any operations that require a private key (such as<span>&nbsp;</span><code>derive_public_key</code>,<span>&nbsp;</span><code>derive_secret</code>,<span>&nbsp;</span><code>derive_keys</code>,<span>&nbsp;</span><code>sign</code>,<span>&nbsp;</span><code>encrypt_data</code>,<span>&nbsp;</span><code>decrypt_cipher</code>, and<span>&nbsp;</span><code>hmac</code>).</p>
+<h1 id="derive_public_key" class="anchor"><code>derive_public_key</code></h1>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>void</span><span> derive_public_key</span><span>();</span></span></code></pre>
+<p>From the loaded private key, generate the public key in ASN.1 format and place it in the<span>&nbsp;</span><code>public_key</code><span>&nbsp;</span>global variable.</p>
+<h1 id="derive_secret" class="anchor"><code>derive_secret</code></h1>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>void</span><span> derive_secret</span><span>();</span></span></code></pre>
+<p>After loading the peer public key with<span>&nbsp;</span><code>load_peer_public_key</code><span>&nbsp;</span>and generating a private key, you may derive the shared (EC) Diffie-Hellman secret by calling this function.</p>
+<h1 id="derive_keys" class="anchor"><code>derive_keys</code></h1>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>void</span><span> derive_keys</span><span>(</span><span>const</span><span> uint8_t*</span><span> salt</span><span>, </span><span>size_t</span><span> size</span><span>);</span></span></code></pre>
+<p>Using HKDF, derive two keys: 1) info ENC for symmetric encryption, and 2) info MAC for message authentication. Both keys need a salt.</p>
+<h2 id="parameters-5" class="anchor">Parameters</h2>
+<ul>
+    <li><code>const uint8_t* salt</code>: Buffer containing the salt material for key derivation. (Hint: For Project 2, it&rsquo;s the<span>&nbsp;</span><code>Client-Hello</code><span>&nbsp;</span>with the<span>&nbsp;</span><code>Server-Hello</code><span>&nbsp;</span>appended right after.)</li>
+    <li><code>size_t size</code>: Length in bytes of given salt.</li>
+</ul>
+<h1 id="sign" class="anchor"><code>sign</code></h1>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>size_t</span><span> sign</span><span>(</span><span>uint8_t*</span><span> signature</span><span>, </span><span>const</span><span> uint8_t*</span><span> data</span><span>, </span><span>size_t</span><span> size</span><span>);</span></span></code></pre>
+<p>Generate a signature over the given data using the private key.</p>
+<h2 id="parameters-6" class="anchor">Parameters</h2>
+<ul>
+    <li><code>uint8_t* signature</code>: Buffer to store the signature. ASN.1 ECDSA signatures have a maximum length of 72 bytes.</li>
+    <li><code>const uint8_t* data</code>: Data to calculate signature over.</li>
+    <li><code>size_t size</code>: Size of the given data in bytes.</li>
+</ul>
+<h2 id="returns-1" class="anchor">Returns</h2>
+<p>The resulting size of the signature stored in the<span>&nbsp;</span><code>signature</code><span>&nbsp;</span>buffer.</p>
+<h1 id="verify" class="anchor"><code>verify</code></h1>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>int</span><span> verify</span><span>(</span><span>const</span><span> uint8_t*</span><span> signature</span><span>, </span><span>size_t</span><span> sig_size</span><span>, </span><span>const</span><span> uint8_t*</span><span> data</span><span>, </span><span>size_t</span><span> size</span><span>, EVP_PKEY</span><span>*</span><span> authority</span><span>);</span></span></code></pre>
+<p>Verify if a given signature has indeed been signed by some authority over some data.</p>
+<h2 id="parameters-7" class="anchor">Parameters</h2>
+<ul>
+    <li><code>const uint8_t* signature</code>: Signature to verify.</li>
+    <li><code>size_t sig_size</code>: Size of signature to verify.</li>
+    <li><code>const uint8_t* data</code>: Data that signature was calculated over.</li>
+    <li><code>size_t size</code>: Size of data.</li>
+    <li><code>EVP_PKEY* authority</code>: Determines which public key to use when verifying the signature. (<code>ec_ca_public_key</code><span>&nbsp;</span>and<span>&nbsp;</span><code>ec_peer_public_key</code><span>&nbsp;</span>are options.)</li>
+</ul>
+<h2 id="returns-2" class="anchor">Returns</h2>
+<p><strong>1</strong><span>&nbsp;</span>if verification is successful,<span>&nbsp;</span><strong>0</strong><span>&nbsp;</span>if the signature is invalid, and<span>&nbsp;</span><strong>any other value</strong><span>&nbsp;</span>if there was some error in processing the parameters.</p>
+<h1 id="generate_nonce" class="anchor"><code>generate_nonce</code></h1>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>void</span><span> generate_nonce</span><span>(</span><span>uint8_t*</span><span> buf</span><span>, </span><span>size_t</span><span> size</span><span>);</span></span></code></pre>
+<p>Write random bytes to a buffer up to a given size.</p>
+<h2 id="parameters-8" class="anchor">Parameters</h2>
+<ul>
+    <li><code>uint8_t* buf</code>: Buffer to write random bytes to.</li>
+    <li><code>size_t size</code>: Number of bytes to write.</li>
+</ul>
+<h1 id="encrypt_data" class="anchor"><code>encrypt_data</code></h1>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>size_t</span><span> encrypt_data</span><span>(</span><span>uint8_t*</span><span> iv</span><span>, </span><span>uint8_t*</span><span> cipher</span><span>, </span><span>const</span><span> uint8_t*</span><span> data</span><span>, </span><span>size_t</span><span> size</span><span>);</span></span></code></pre>
+<p>After deriving the ENC key, this function can take some data and output the corresponding ciphertext + IV (AES-256-CBC).</p>
+<h2 id="parameters-9" class="anchor">Parameters</h2>
+<ul>
+    <li><code>uint8_t* iv</code>: Buffer to write IV to.</li>
+    <li><code>uint8_t* cipher</code>: Buffer to write ciphertext to.</li>
+    <li><code>const uint8_t* data</code>: Buffer containing the plaintext to encrypt.</li>
+    <li><code>size_t size</code>: Size of plaintext.</li>
+</ul>
+<h2 id="returns-3" class="anchor">Returns</h2>
+<p>The size of the ciphertext. Please note that the ciphertext can be up to 16 bytes longer than the plaintext.</p>
+<h1 id="decrypt_cipher" class="anchor"><code>decrypt_cipher</code></h1>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>size_t</span><span> decrypt_cipher</span><span>(</span><span>uint8_t*</span><span> data</span><span>, </span><span>const</span><span> uint8_t*</span><span> cipher</span><span>, </span><span>size_t</span><span> size</span><span>, </span><span>const</span><span> uint8_t*</span><span> iv</span><span>);</span></span></code></pre>
+<p>After deriving the ENC key, this function can take some ciphertext and IV and output the corresponding plaintext.</p>
+<h2 id="parameters-10" class="anchor">Parameters</h2>
+<ul>
+    <li><code>uint8_t* data</code>: Buffer to write plaintext to.</li>
+    <li><code>const uint8_t* cipher</code>: Buffer containing ciphertext.</li>
+    <li><code>size_t size</code>: Size of ciphertext.</li>
+    <li><code>const uint8_t* iv</code>: Buffer containing IV.</li>
+</ul>
+<h2 id="returns-4" class="anchor">Returns</h2>
+<p>The size of the plaintext.</p>
+<h1 id="hmac" class="anchor"><code>hmac</code></h1>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>void</span><span> hmac</span><span>(</span><span>uint8_t*</span><span> digest</span><span>, </span><span>const</span><span> uint8_t*</span><span> data</span><span>, </span><span>size_t</span><span> size</span><span>);</span></span></code></pre>
+<p>Calculates HMAC digest over some given data using the derived MAC key.</p>
+<h2 id="parameters-11" class="anchor">Parameters</h2>
+<ul>
+    <li><code>uint8_t* digest</code>: Buffer to write digest to.</li>
+    <li><code>const uint8_t* data</code>: Buffer to read data from.</li>
+    <li><code>size_t size</code>: Size of data to calculate digest over.</li>
+</ul>
