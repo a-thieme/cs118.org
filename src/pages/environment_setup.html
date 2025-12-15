@@ -1,0 +1,65 @@
+<h1 class="page-title">Overview</h1>
+<div id="todo-date-mount-point"></div>
+<p>Welcome to CS 118! This document will help you setup your environment so you can easily work on the projects this quarter. We&rsquo;ll go over the setup for Windows and macOS (with Visual Studio Code as an IDE). If you&rsquo;re using Linux (or any other operating system/IDE), we&rsquo;ll assume you know what you&rsquo;re doing. Nonetheless, feel free to attend TA office hours if you need any help.</p>
+<h1 id="setting-up-wsl-windows-only" class="anchor">Setting up WSL (Windows Only)</h1>
+<p>WSL stands for Windows Subsystem for Linux&mdash;this essentially creates a Linux virtual machine that&rsquo;s deeply integrated into your Windows system. If you&rsquo;re on Windows,<span>&nbsp;</span><strong>please use WSL</strong>. We&rsquo;ve had students who used MinGW and other runtimes&mdash;they had a much harder time developing their projects.</p>
+<p>These steps were verified to work on Windows 11 x64 23H2. They may work on previous versions of Windows (down to Windows 10), but it&rsquo;s not guaranteed. Please seek help in office hours if you get stuck.</p>
+<p>Here are the steps to get WSL set up:</p>
+<ol>
+    <li>Go to the Microsoft Store and search for Ubuntu (feel free to install any distro, but we&rsquo;ve just tested with Ubuntu). Install it.</li>
+    <li>Go to Control Panel (Win + R, type<span>&nbsp;</span><code>control</code>, hit enter) &gt; Programs and Features &gt; Turn Windows features on or off. Select Windows Subsystem for Linux.</li>
+    <li>Reboot your computer.</li>
+    <li>Go to your command prompt and enter the following commands:<br /><code>wsl.exe --update</code><br /><code>wsl.exe --install Ubuntu</code></li>
+    <li>Reboot your computer.</li>
+    <li>Go to your command prompt and enter<span>&nbsp;</span><code>ubuntu</code>. Follow the prompts to set up your UNIX username and password.</li>
+    <li>Once you&rsquo;re in your Ubuntu install, run the following commands:<br /><code>sudo apt update</code><br /><code>sudo apt install -y make gcc libssl-dev</code></li>
+</ol>
+<p>You&rsquo;ve now got a working WSL install!</p>
+<h1 id="setting-up-command-line-tools--extras-macos-only" class="anchor">Setting up Command Line Tools + Extras (macOS Only)</h1>
+<p>macOS should be&nbsp;fairly compatible development machine right out of the box. However, there are a couple of other tools you need to install first.</p>
+<ol>
+    <li>Open Terminal.</li>
+    <li>Install the Command Line Tools by entering<span>&nbsp;</span><code>xcode-select --install</code>. Follow the instructions.</li>
+    <li>Install Homebrew, a package manager for macOS. Follow the instructions at<span>&nbsp;</span><a class="external" href="https://brew.sh/" target="_blank" rel="noopener"><span>https://brew.sh</span><span class="external_link_icon" role="presentation"><span class="screenreader-only">Links to an external site.</span></span></a>.</li>
+</ol>
+<h1 id="installing-docker" class="anchor">Installing Docker</h1>
+<p>We&rsquo;ll be using Docker, which is a form of containerization software that creates isolated environments according to certain specifications, to replicate our autograding environment. Feel free to read more about it<span>&nbsp;</span><a class="external" href="https://www.ibm.com/topics/docker" target="_blank" rel="noopener"><span>here</span><span class="external_link_icon" role="presentation"><span class="screenreader-only">Links to an external site.</span></span></a>. All you really need to know is that it&rsquo;s very similar to a virtual machine.</p>
+<p>Let&rsquo;s install Docker on your system. Head over to<span>&nbsp;</span><a class="external" href="https://www.docker.com/" target="_blank" rel="noopener"><span>https://www.docker.com</span><span class="external_link_icon" role="presentation"><span class="screenreader-only">Links to an external site.</span></span></a><span>&nbsp;</span>and click on the install button for your machine. Follow the installation instructions. (<strong>On Windows, make sure the WSL 2 option is selected.</strong><span>&nbsp;</span>If you forgot to do this/you already have Docker Desktop installed, visit<span>&nbsp;</span><a class="external" href="https://docs.docker.com/desktop/wsl/#turn-on-docker-desktop-wsl-2" target="_blank" rel="noopener"><span>this page for more information</span><span class="external_link_icon" role="presentation"><span class="screenreader-only">Links to an external site.</span></span></a>.)</p>
+<p>If you&rsquo;re on macOS, a nice alternative to Docker Desktop is<span>&nbsp;</span><a class="external" href="https://orbstack.dev/" target="_blank" rel="noopener"><span>OrbStack</span><span class="external_link_icon" role="presentation"><span class="screenreader-only">Links to an external site.</span></span></a>-highly recommended, and works exactly the same as Docker Desktop.</p>
+<h1 id="installing-openssl-3" class="anchor">Installing OpenSSL 3</h1>
+<p>In Project 2, you&rsquo;ll be using<span>&nbsp;</span><code>libcrypto</code><span>&nbsp;</span>from OpenSSL 3 to write a makeshift TLS-like layer to add security to our quarter-long project. We won&rsquo;t be doing that now, but we&rsquo;d like to make sure you&rsquo;ve got it installed beforehand.</p>
+<p>If you haven&rsquo;t already, on WSL (or any Debian based system), run<span>&nbsp;</span><code>sudo apt install -y libssl-dev</code>.</p>
+<p>On macOS, run:</p>
+<pre class="astro-code github-dark" data-language="bash"><code><span class="line"><span>$</span><span> brew</span><span> install</span><span> openssl</span></span>
+<span class="line"><span>$</span><span> sudo</span><span> ln</span><span> -s</span><span> $(</span><span>brew</span><span> --prefix</span><span>)</span><span>/Cellar/openssl@3/3.4.1/include/openssl</span><span> /usr/local/include/</span></span>
+<span class="line"><span>$</span><span> sudo</span><span> ln</span><span> -s</span><span> $(</span><span>brew</span><span> --prefix</span><span>)</span><span>/Cellar/openssl@3/3.4.1/lib/libcrypto.a</span><span> /usr/local/lib</span></span></code></pre>
+<p>Notes:</p>
+<ul>
+    <li>You may have to change the version number in the commands provided above. 3.4.1 is the latest version provided by Homebrew as of April 1st, 2025.</li>
+    <li>You also may have to create the directories<span>&nbsp;</span><code>/usr/local/lib</code><span>&nbsp;</span>and<span>&nbsp;</span><code>/usr/local/include</code><span>&nbsp;</span>before running the above commands.</li>
+    <li>On Intel machines, Homebrew may have already linked these directories. That&rsquo;s okay.</li>
+</ul>
+<h1 id="installing-visual-studio-code" class="anchor">Installing Visual Studio Code</h1>
+<p>As said in the overview, the exact IDE you use really isn&rsquo;t that important. However, we&rsquo;ll provide instructions here as official support (Visual Studio Code (VSC) also has great WSL support for Windows users).</p>
+<p>Head over to<span>&nbsp;</span><a class="external" href="https://code.visualstudio.com/" target="_blank" rel="noopener"><span>https://code.visualstudio.com</span><span class="external_link_icon" role="presentation"><span class="screenreader-only">Links to an external site.</span></span></a><span>&nbsp;</span>to download and install the appropriate version of VSC. Follow the instructions and any prompts.</p>
+<p>Launch VSC. Follow these instructions if you&rsquo;re on WSL:</p>
+<ol>
+    <li>On first launch, VSC will recommend installing the WSL extension. (If the prompt doesn&rsquo;t show up, install it in the Extensions tab.) Follow the prompts to install it and restart VSC.</li>
+    <li>In the bottom, left-hand corner of your window, there should be a colored remote connect button. Select it and click on Connect to WSL.</li>
+    <li>This will open up a new window that&rsquo;s connected to your WSL installation! You&rsquo;ll have to repeat step 2 any time you open up a new VSC workspace.</li>
+</ol>
+<p>In your VSC terminal (open it up by pressing<span>&nbsp;</span><code>Ctrl + `</code>. Note that it&rsquo;s the same for macOS), clone our<span>&nbsp;</span><span><strong>Starter Code</strong></span><span class="external_link_icon" role="presentation"><span class="screenreader-only">Links to an external site.</span></span><span>&nbsp;</span>using Git. Launch the repo in a new workspace by running<span>&nbsp;</span><code>code project0starter</code>.</p>
+<p>Now, follow these steps to set up code completion:</p>
+<ol>
+    <li>Select the file<span>&nbsp;</span><code>project &gt; client.c</code><span>&nbsp;</span>in the left hand side navigator. VSC will prompt you to install the C/C++ extension. (If it doesn&rsquo;t prompt you, check in the Extensions tab.)</li>
+    <li>Once it&rsquo;s done installing, restart VSC.</li>
+    <li>Select the same file. There might be a warning in the bottom right corner to install a new compiler. Follow those steps and restart VSC.</li>
+    <li>Add the directive<span>&nbsp;</span><code>#include &lt;openssl/evp.h&gt;</code>. If there&rsquo;s a red squiggly line under it, you don&rsquo;t have OpenSSL in your include path.
+        <ol>
+            <li>VSC may prompt you to fix this issue. Follow its suggestion.</li>
+            <li>Please visit office hours if you&rsquo;re still unable to fix this issue.</li>
+        </ol>
+    </li>
+    <li><strong>Remove<span>&nbsp;</span><code>#include &lt;openssl/evp.h&gt;</code>. We&rsquo;re just using this line to test your include path.</strong></li>
+</ol>
+<p>And that&rsquo;s it! You should be set to start on the projects this quarter.</p>
