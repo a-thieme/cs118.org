@@ -1,0 +1,22 @@
+<h1 data-astro-cid-q76m63bn="">Using the Local Autograder (...for Project 2)</h1>
+<p>Running testcases, using<span>&nbsp;</span><code>./helper interactive</code>, and zipping up your submission are all the same, but there are a couple of key differences when using the autograder for Project 2.</p>
+<h1 id="manual-testing" class="anchor">Manual Testing</h1>
+<p>A large part of Project 2 is managing keys and certificates. As per the spec, the CA public key, the server private key, and the server&rsquo;s certificate (signed by the CA) are all in the current working directory.</p>
+<p>In<span>&nbsp;</span><code>/autograder/source/keys</code>, there&rsquo;s a script called<span>&nbsp;</span><code>gen_files</code>. This script will automatically generate the requisite files to test your code.</p>
+<p>Since the files are in this directory, running the executables manually is a bit different.</p>
+<pre class="astro-code github-dark" data-language="bash"><code><span class="line"><span>$</span><span> cd</span><span> /autograder/submission</span></span>
+<span class="line"><span>$</span><span> make</span></span>
+<span class="line"><span>$</span><span> cd</span><span> /autograder/source/keys</span></span>
+<span class="line"><span>$</span><span> ./gen_files</span></span>
+<span class="line"><span>$</span><span> ../../submission/server</span><span> 8080</span></span>
+<span class="line"><span>$</span><span> ../src/server</span><span> 8080</span><span> # To use the reference implementation</span></span></code></pre>
+<p>In short, test out the binaries while the CWD is<span>&nbsp;</span><code>/autograder/source/keys</code>.</p>
+<h1 id="not-just-localhost-anymore" class="anchor">Not just<span>&nbsp;</span><code>localhost</code><span>&nbsp;</span>anymore</h1>
+<p>In Project 1, we ran<span>&nbsp;</span><code>./client localhost 8080</code><span>&nbsp;</span>without much regard to what<span>&nbsp;</span><code>localhost</code><span>&nbsp;</span>means. In Project 2, the hostname (first command line argument) is a real DNS name. The starter code will automatically run DNS to find the IP address of the hostname. Feel free to continue testing with<span>&nbsp;</span><code>localhost</code><span>&nbsp;</span>since that&rsquo;s what the default DNS name will be in the certificates we give you, but your solution should work for any DNS name.</p>
+<h1 id="custom-test-cases" class="anchor">Custom Test Cases</h1>
+<p>To test out odd functionality, you may switch out the secondary versions of files.</p>
+<ul>
+    <li>The two<span>&nbsp;</span><code>ca_public_key.bin</code><span>&nbsp;</span>files can be switched out to test if your client is checking for the CA&rsquo;s signature properly.</li>
+    <li>The two<span>&nbsp;</span><code>server_key.bin</code><span>&nbsp;</span>files can be switched out to test if your client is checking that the server really does own the certificate.</li>
+    <li>The two<span>&nbsp;</span><code>server_cert.bin</code><span>&nbsp;</span>files can be switched out to test if your client is checking the DNS name properly (The regular one has<span>&nbsp;</span><code>localhost</code><span>&nbsp;</span>as the DNS name, but the other has<span>&nbsp;</span><code>example.com</code>.</li>
+</ul>
