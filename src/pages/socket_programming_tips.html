@@ -1,0 +1,338 @@
+<h1 id="socket-programming-with-udp" class="anchor">Socket Programming with UDP</h1>
+<h2 id="server-side" class="anchor">Server Side</h2>
+<ol start="0">
+    <li>Include all necessary header files.</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><span class="line"><span>#include</span><span> &lt;sys/socket.h&gt;</span><span> // Socket interface</span></span>
+<span class="line"><span>#include</span><span> &lt;arpa/inet.h&gt;</span><span> // Internet protocol</span></span>
+<span class="line"><span>#include</span><span> &lt;string.h&gt;</span><span> // strlen</span></span>
+<span class="line"><span>#include</span><span> &lt;unistd.h&gt;</span><span> // close, etc.</span></span>
+<span class="line"><span>#include</span><span> &lt;errno.h&gt;</span><span> // Get error number</span></span></pre>
+<ol>
+    <li>Create the socket and get its file descriptor.</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>/* 1. Create socket */</span></span>
+<span class="line"><span>int</span><span> sockfd </span><span>=</span><span> socket</span><span>(AF_INET, SOCK_DGRAM, </span><span>0</span><span>);</span></span>
+<span class="line"><span>                 // use IPv4  use UDP</span></span></code></pre>
+<p><code>AF_INET</code><span>&nbsp;</span>specifies to use IPv4 and<span>&nbsp;</span><code>SOCK_DGRAM</code><span>&nbsp;</span>specifies to use UDP.</p>
+<ol start="2">
+    <li>Create the server address to accept connections.</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>/* 2. Construct our address */</span></span>
+<span class="line"><span>struct</span><span> sockaddr_in servaddr;</span></span>
+<span class="line"><span>servaddr.sin_family </span><span>=</span><span> AF_INET;</span><span> // use IPv4</span></span>
+<span class="line"><span>servaddr.sin_addr.s_addr </span><span>=</span><span> INADDR_ANY;</span><span> // accept all connections</span></span>
+<span class="line"><span>                        // same as inet_addr("0.0.0.0") </span></span>
+<span class="line"><span>                                 // "Address string to network bytes"</span></span>
+<span class="line"><span>// Set receiving port</span></span>
+<span class="line"><span>int</span><span> PORT </span><span>=</span><span> 8080</span><span>;</span></span>
+<span class="line"><span>servaddr.sin_port </span><span>=</span><span> htons</span><span>(PORT);</span><span> // Big endian</span></span></code></pre>
+<p>Networking is always done in big-endian format, so<span>&nbsp;</span><code>htons</code><span>&nbsp;</span>is required to change the byte ordering from host to network.</p>
+<ol start="3">
+    <li>Bind the socket with the server address.</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>/* 3. Let operating system know about our config */</span></span>
+<span class="line"><span>int</span><span> did_bind </span><span>=</span><span> bind</span><span>(sockfd, (</span><span>struct</span><span> sockaddr</span><span>*</span><span>) </span><span>&amp;</span><span>servaddr</span><span>, </span></span>
+<span class="line"><span>                    sizeof</span><span>(servaddr));</span></span>
+<span class="line"><span>// Error if did_bind &lt; 0 :(</span></span>
+<span class="line"><span>if</span><span> (did_bind </span><span>&lt;</span><span> 0</span><span>) </span><span>return</span><span> errno;</span></span></code></pre>
+<ol start="4">
+    <li>Create a buffer to store messages from clients.</li>
+</ol>
+<p>Also, create a temporary client address struct to inspect client information (IP address, source port).</p>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>/* 4. Create buffer to store incoming data */</span></span>
+<span class="line"><span>int</span><span> BUF_SIZE </span><span>=</span><span> 1024</span><span>;</span></span>
+<span class="line"><span>char</span><span> client_buf</span><span>[BUF_SIZE];</span></span>
+<span class="line"><span>struct</span><span> sockaddr_in clientaddr </span><span>=</span><span> {</span><span>0</span><span>};</span><span> // Same information, but about client</span></span>
+<span class="line"><span>socklen_t</span><span> clientsize </span><span>=</span><span> sizeof</span><span>(clientaddr);</span></span></code></pre>
+<ol start="5">
+    <li>Listen to messages from clients. Feel free to put these steps in a loop to create an ever-listening server.</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>/* 5. Listen for data from clients */</span></span>
+<span class="line"><span>int</span><span> bytes_recvd </span><span>=</span><span> recvfrom</span><span>(sockfd, client_buf, BUF_SIZE, </span></span>
+<span class="line"><span>                        // socket  store data  how much</span></span>
+<span class="line"><span>                           0</span><span>, (</span><span>struct</span><span> sockaddr</span><span>*</span><span>) </span><span>&amp;</span><span>clientaddr</span><span>, </span></span>
+<span class="line"><span>                           &amp;</span><span>clientsize</span><span>);</span></span>
+<span class="line"><span>// Execution will stop here until `BUF_SIZE` is read or termination/error</span></span>
+<span class="line"><span>// Error if bytes_recvd &lt; 0 :(</span></span>
+<span class="line"><span>if</span><span> (bytes_recvd </span><span>&lt;</span><span> 0</span><span>) </span><span>return</span><span> errno;</span></span></code></pre>
+<ol start="6">
+    <li>Inspect the client IP address, source port, and the sent message.</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>/* 6. Inspect data from client */</span></span>
+<span class="line"><span>char*</span><span> client_ip </span><span>=</span><span> inet_ntoa</span><span>(clientaddr.sin_addr);</span></span>
+<span class="line"><span>                // "Network bytes to address string"</span></span>
+<span class="line"><span>int</span><span> client_port </span><span>=</span><span> ntohs</span><span>(clientaddr.sin_port);</span><span> // Little endian</span></span></code></pre>
+<p>The client message is in<span>&nbsp;</span><code>client_buf</code>.</p>
+<ol start="7">
+    <li>Send a message back to the client (place the message in some buffer, let&rsquo;s say<span>&nbsp;</span><code>server_buf</code>).</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>/* 7. Send data back to client */</span></span>
+<span class="line"><span>char</span><span> server_buf</span><span>[]</span><span> =</span><span> "Hello world!"</span><span>;</span></span>
+<span class="line"><span>int</span><span> did_send </span><span>=</span><span> sendto</span><span>(sockfd, server_buf, </span><span>strlen</span><span>(server_buf), </span></span>
+<span class="line"><span>                   // socket  send data   how much to send</span></span>
+<span class="line"><span>                      0</span><span>, (</span><span>struct</span><span> sockaddr</span><span>*</span><span>) </span><span>&amp;</span><span>clientaddr</span><span>, </span></span>
+<span class="line"><span>                   // flags   where to send</span></span>
+<span class="line"><span>                      sizeof</span><span>(clientaddr));</span></span></code></pre>
+<ol start="8">
+    <li>On interrupt (or on any exit), close the server.</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>/* 8. You're done! Terminate the connection */</span>     </span>
+<span class="line"><span>close</span><span>(sockfd);</span></span></code></pre>
+<h2 id="client-side" class="anchor">Client Side</h2>
+<ol start="0">
+    <li>Include all necessary header files.</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>#include</span><span> &lt;sys/socket.h&gt;</span><span> // Socket interface</span></span>
+<span class="line"><span>#include</span><span> &lt;arpa/inet.h&gt;</span><span> // Internet protocol</span></span>
+<span class="line"><span>#include</span><span> &lt;string.h&gt;</span><span> // strlen</span></span>
+<span class="line"><span>#include</span><span> &lt;unistd.h&gt;</span><span> // close, etc.</span></span>
+<span class="line"><span>#include</span><span> &lt;errno.h&gt;</span><span> // Get error number</span></span></code></pre>
+<ol>
+    <li>Create the socket and get its file descriptor.</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>/* 1. Create socket */</span></span>
+<span class="line"><span>int</span><span> sockfd </span><span>=</span><span> socket</span><span>(AF_INET, SOCK_DGRAM, </span><span>0</span><span>);</span></span>
+<span class="line"><span>                 // use IPv4  use UDP</span></span></code></pre>
+<p><code>AF_INET</code><span>&nbsp;</span>specifies to use IPv4 and<span>&nbsp;</span><code>SOCK_DGRAM</code><span>&nbsp;</span>specifies to use UDP.</p>
+<ol start="2">
+    <li>Create the server address to connect to the server.</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>/* 2. Construct our address */</span></span>
+<span class="line"><span>struct</span><span> sockaddr_in serveraddr;</span></span>
+<span class="line"><span>serveraddr.sin_family </span><span>=</span><span> AF_INET;</span><span> // use IPv4</span></span>
+<span class="line"><span>serveraddr.sin_addr.s_addr </span><span>=</span><span> inet_addr</span><span>(</span><span>"127.0.0.1"</span><span>);</span></span>
+<span class="line"><span>// Set receiving port</span></span>
+<span class="line"><span>int</span><span> PORT </span><span>=</span><span> 8080</span><span>;</span></span>
+<span class="line"><span>serveraddr.sin_port </span><span>=</span><span> htons</span><span>(PORT);</span><span> // Big endian</span></span></code></pre>
+<p>Networking is always done in big-endian format, so<span>&nbsp;</span><code>htons</code><span>&nbsp;</span>is required to change the byte ordering from host to network.</p>
+<ol start="3">
+    <li>Send a message to the server (place the message in some buffer, let&rsquo;s say<span>&nbsp;</span><code>client_buf</code>).</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>/* 3. Send data to server */</span></span>
+<span class="line"><span>char</span><span> client_buf</span><span>[]</span><span> =</span><span> "Hello world!"</span><span>;</span></span>
+<span class="line"><span>int</span><span> did_send </span><span>=</span><span> sendto</span><span>(sockfd, client_buf, </span><span>strlen</span><span>(client_buf),</span></span>
+<span class="line"><span>                   // socket  send data   how much to send</span></span>
+<span class="line"><span>                      0</span><span>, (</span><span>struct</span><span> sockaddr</span><span>*</span><span>) </span><span>&amp;</span><span>serveraddr</span><span>,</span></span>
+<span class="line"><span>                   // flags   where to send</span></span>
+<span class="line"><span>                      sizeof</span><span>(serveraddr));</span></span>
+<span class="line"><span>if</span><span> (did_send </span><span>&lt;</span><span> 0</span><span>) </span><span>return</span><span> errno;</span></span></code></pre>
+<ol start="4">
+    <li>Create a buffer to store messages from the server.</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>/* 4. Create buffer to store incoming data */</span></span>
+<span class="line"><span>int</span><span> BUF_SIZE </span><span>=</span><span> 1024</span><span>;</span></span>
+<span class="line"><span>char</span><span> server_buf</span><span>[BUF_SIZE];</span></span>
+<span class="line"><span>socklen_t</span><span> serversize </span><span>=</span><span> sizeof</span><span>(</span><span>struct</span><span> sockaddr_in);</span><span> // Temp buffer for recvfrom API</span></span></code></pre>
+<ol start="5">
+    <li>Listen to messages from server. Feel free to put these steps in a loop to create an ever-listening client.</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>/* 5. Listen for response from server */</span></span>
+<span class="line"><span>int</span><span> bytes_recvd </span><span>=</span><span> recvfrom</span><span>(sockfd, server_buf, BUF_SIZE, </span></span>
+<span class="line"><span>                        // socket  store data  how much</span></span>
+<span class="line"><span>                           0</span><span>, (</span><span>struct</span><span> sockaddr</span><span>*</span><span>) </span><span>&amp;</span><span>serveraddr</span><span>, </span></span>
+<span class="line"><span>                           &amp;</span><span>serversize</span><span>);</span></span>
+<span class="line"><span>// Execution will stop here until `BUF_SIZE` is read or termination/error</span></span>
+<span class="line"><span>// Error if bytes_recvd &lt; 0 :(</span></span>
+<span class="line"><span>if</span><span> (bytes_recvd </span><span>&lt;</span><span> 0</span><span>) </span><span>return</span><span> errno;</span></span>
+<span class="line"><span>// Print out data</span></span>
+<span class="line"><span>write</span><span>(</span><span>1</span><span>, server_buf, bytes_recvd);</span></span></code></pre>
+<ol start="6">
+    <li>On interrupt (or on any exit), close the server.</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>/* 8. You're done! Terminate the connection */</span>     </span>
+<span class="line"><span>close</span><span>(sockfd);</span></span></code></pre>
+<h2 id="aside-using-non-blocking-sockets" class="anchor">Aside: Using non-blocking sockets</h2>
+<p>When using<span>&nbsp;</span><code>recvfrom</code>, the default behavior is to block the current thread. However, you&rsquo;ll want these functions to simply check if there&rsquo;s any data available from the other host and continue to process other data (<strong>maybe read from standard in&mdash;which you can also make non-blocking</strong>).</p>
+<p>We can use the<span>&nbsp;</span><code>fcntl</code><span>&nbsp;</span>or Control Open File Descriptors system call to modify our socket to be non-blocking&mdash;if there&rsquo;s no data, it simply continues execution.</p>
+<ol start="0">
+    <li>Include another header file.</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>#include</span><span> &lt;fcntl.h&gt;</span></span></code></pre>
+<ol>
+    <li>After setting up your socket with the<span>&nbsp;</span><code>socket</code><span>&nbsp;</span>syscall, modify it using the<span>&nbsp;</span><code>fcntl</code><span>&nbsp;</span>syscall to be non-blocking.</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>// Setup fd set for nonblock</span></span>
+<span class="line"><span>int</span><span> flags </span><span>=</span><span> fcntl</span><span>(sockfd, F_GETFL);</span></span>
+<span class="line"><span>flags </span><span>|=</span><span> O_NONBLOCK;</span></span>
+<span class="line"><span>fcntl</span><span>(sockfd, F_SETFL, flags);</span></span></code></pre>
+<ol start="2">
+    <li>Now when using<span>&nbsp;</span><code>recvfrom</code>, the call will continue even if there&rsquo;s no data.</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>while</span><span> (</span><span>true</span><span>) {</span></span>
+<span class="line"><span>  /* Do some processing here */</span></span>
+	
+<span class="line"><span>  int</span><span> bytes_recvd </span><span>=</span><span> recvfrom</span><span>(sockfd, client_buf, BUF_SIZE, </span></span>
+<span class="line"><span>	                        // socket  store data  how much</span></span>
+<span class="line"><span>	                           0</span><span>, (</span><span>struct</span><span> sockaddr</span><span>*</span><span>) </span><span>&amp;</span><span>clientaddr, </span></span>
+<span class="line"><span>	                           &amp;</span><span>clientsize);</span></span>
+<span class="line"><span>  // No data yet, we can continue processing at the top of this loop</span></span>
+<span class="line"><span>  if</span><span> (bytes_recvd </span><span>&lt;=</span><span> 0</span><span>) </span><span>continue</span><span>;              </span></span>
+	                      
+<span class="line"><span>  /* Data available; we can now process the data */</span>                  </span>
+<span class="line"><span>}</span></span></code></pre>
+<h1 id="socket-programming-with-tcp" class="anchor">Socket Programming with TCP</h1>
+<h2 id="server-side-1" class="anchor">Server Side</h2>
+<ol start="0">
+    <li>Include all necessary header files.</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>#include</span><span> &lt;sys/socket.h&gt;</span><span> // Socket interface</span></span>
+<span class="line"><span>#include</span><span> &lt;arpa/inet.h&gt;</span><span> // Internet protocol</span></span>
+<span class="line"><span>#include</span><span> &lt;string.h&gt;</span><span> // strlen</span></span>
+<span class="line"><span>#include</span><span> &lt;unistd.h&gt;</span><span> // close, etc.</span></span>
+<span class="line"><span>#include</span><span> &lt;errno.h&gt;</span><span> // Get errorno</span></span></code></pre>
+<ol>
+    <li>Create the socket and get its file descriptor.</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>/* 1. Create socket */</span></span>
+<span class="line"><span>int</span><span> sockfd </span><span>=</span><span> socket</span><span>(AF_INET, SOCK_STREAM, </span><span>0</span><span>);</span></span>
+<span class="line"><span>                 // use IPv4  use TCP</span></span></code></pre>
+<p><code>AF_INET</code><span>&nbsp;</span>specifies to use IPv4 and<span>&nbsp;</span><code>SOCK_STREAM</code><span>&nbsp;</span>specifies to use TCP.</p>
+<ol start="2">
+    <li>Create the server address to accept connections.</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>/* 2. Construct our address */</span></span>
+<span class="line"><span>struct</span><span> sockaddr_in servaddr;</span></span>
+<span class="line"><span>servaddr.sin_family </span><span>=</span><span> AF_INET;</span><span> // use IPv4</span></span>
+<span class="line"><span>servaddr.sin_addr.s_addr </span><span>=</span><span> INADDR_ANY;</span><span> // accept all connections</span></span>
+<span class="line"><span>                        // same as inet_addr("0.0.0.0") </span></span>
+<span class="line"><span>                                 // "Address string to network bytes"</span></span>
+<span class="line"><span>// Set receiving port</span></span>
+<span class="line"><span>int</span><span> PORT </span><span>=</span><span> 8080</span><span>;</span></span>
+<span class="line"><span>servaddr.sin_port </span><span>=</span><span> htons</span><span>(PORT);</span><span> // Big endian</span></span></code></pre>
+<p>Networking is always done in big-endian format, so<span>&nbsp;</span><code>htons</code><span>&nbsp;</span>is required to change the byte ordering from host to network.</p>
+<ol start="3">
+    <li>Bind the socket with the server address.</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>/* 3. Let operating system know about our config */</span></span>
+<span class="line"><span>int</span><span> did_bind </span><span>=</span><span> bind</span><span>(sockfd, (</span><span>struct</span><span> sockaddr</span><span>*</span><span>) </span><span>&amp;</span><span>servaddr</span><span>, </span></span>
+<span class="line"><span>                    sizeof</span><span>(servaddr));</span></span>
+<span class="line"><span>// Error if did_bind &lt; 0 :(</span></span>
+<span class="line"><span>if</span><span> (did_bind </span><span>&lt;</span><span> 0</span><span>) </span><span>return</span><span> errno;</span></span></code></pre>
+<ol start="4">
+    <li>Create a buffer to store messages from clients.</li>
+</ol>
+<p>Also, create a temporary client address struct to inspect client information (IP address, source port).</p>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>/* 4. Create buffer to store incoming data */</span></span>
+<span class="line"><span>int</span><span> BUF_SIZE </span><span>=</span><span> 1024</span><span>;</span></span>
+<span class="line"><span>char</span><span> client_buf</span><span>[BUF_SIZE];</span></span>
+<span class="line"><span>struct</span><span> sockaddr_in clientaddr </span><span>=</span><span> {</span><span>0</span><span>};</span><span> // Same information, but about client</span></span>
+<span class="line"><span>socklen_t</span><span> clientsize </span><span>=</span><span> sizeof</span><span>(clientaddr);</span></span></code></pre>
+<ol start="5">
+    <li>Listen for new clients by marking this socket as passive.</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>/* 5. Listen for new clients */</span></span>
+<span class="line"><span>int</span><span> did_find_client </span><span>=</span><span> listen</span><span>(sockfd, </span><span>1</span><span>);</span></span>
+<span class="line"><span>                          // socket  flags</span></span>
+<span class="line"><span>// Error if did_find_client &lt; 0 :(</span></span>
+<span class="line"><span>if</span><span> (did_find_client </span><span>&lt;</span><span> 0</span><span>) </span><span>return</span><span> errno;</span></span></code></pre>
+<ol start="6">
+    <li>Accept the client connection by creating a new socket for this client. This will block the current thread until a client attempts to connect. This is the second and third parts of the three way handshake. Feel free to put these steps in a loop to create an ever listening server.</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>/* 6. Accept client connection */</span></span>
+<span class="line"><span>int</span><span> clientfd </span><span>=</span><span> accept</span><span>(sockfd,</span></span>
+<span class="line"><span>                   // socket</span></span>
+<span class="line"><span>                      (</span><span>struct</span><span> sockaddr</span><span>*</span><span>) </span><span>&amp;</span><span>clientaddr</span><span>,</span></span>
+<span class="line"><span>                   // client info</span></span>
+<span class="line"><span>                      &amp;</span><span>clientsize</span><span>);</span></span>
+<span class="line"><span>// Error if clientfd &lt; 0 :(</span></span>
+<span class="line"><span>if</span><span> (clientfd </span><span>&lt;</span><span> 0</span><span>) </span><span>return</span><span> errno;</span></span></code></pre>
+<ol start="7">
+    <li>Inspect the client IP address and the source port.</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>/* 7. Inspect client info */</span></span>
+<span class="line"><span>char*</span><span> client_ip </span><span>=</span><span> inet_ntoa</span><span>(clientaddr.sin_addr);</span></span>
+<span class="line"><span>                // "Network bytes to address string"</span></span>
+<span class="line"><span>int</span><span> client_port </span><span>=</span><span> ntohs</span><span>(clientaddr.sin_port);</span><span> // Little endian</span></span></code></pre>
+<ol start="8">
+    <li>Listen to messages from the client. Feel free to put these steps in a loop to keep the TCP connection alive.</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>/* 8. Listen for messages from client */</span></span>
+<span class="line"><span>int</span><span> bytes_recvd </span><span>=</span><span> recv</span><span>(clientfd, client_buf, BUF_SIZE, </span><span>0</span><span>);</span></span>
+<span class="line"><span>                    // socket  store data  how much flags</span></span>
+                    
+<span class="line"><span>// Execution will stop here until `BUF_SIZE` is read or termination/error</span></span>
+<span class="line"><span>// Error if bytes_recvd &lt; 0 :(</span></span>
+<span class="line"><span>if</span><span> (bytes_recvd </span><span>&lt;</span><span> 0</span><span>) </span><span>return</span><span> errno;</span></span></code></pre>
+<ol start="9">
+    <li>Send a message back to the client (place the message in some buffer, let&rsquo;s say<span>&nbsp;</span><code>server_buf</code>).</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>/* 7. Send data back to client */</span></span>
+<span class="line"><span>char</span><span> server_buf</span><span>[]</span><span> =</span><span> "Hello world!"</span><span>;</span></span>
+<span class="line"><span>int</span><span> did_send </span><span>=</span><span> send</span><span>(clientfd, server_buf, </span><span>strlen</span><span>(server_buf), </span><span>0</span><span>);</span></span>
+<span class="line"><span>                 // socket  send data   how much to send  flags</span></span>
+<span class="line"><span>if</span><span> (did_send </span><span>&lt;</span><span> 0</span><span>) </span><span>return</span><span> errno;</span></span></code></pre>
+<ol start="10">
+    <li>If the application has no need to send messages to this client, close the connection.</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>/* 10. Terminate the client connection */</span></span>
+<span class="line"><span>close</span><span>(clientfd);</span></span></code></pre>
+<ol start="11">
+    <li>On interrupt (or on any exit), close the server.</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>/* 8. You're done! Terminate the connection */</span>     </span>
+<span class="line"><span>close</span><span>(sockfd);</span></span></code></pre>
+<h2 id="client-side-1" class="anchor">Client Side</h2>
+<ol start="0">
+    <li>Include all necessary header files.</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>#include</span><span> &lt;sys/socket.h&gt;</span><span> // Socket interface</span></span>
+<span class="line"><span>#include</span><span> &lt;arpa/inet.h&gt;</span><span> // Internet protocol</span></span>
+<span class="line"><span>#include</span><span> &lt;string.h&gt;</span><span> // strlen</span></span>
+<span class="line"><span>#include</span><span> &lt;unistd.h&gt;</span><span> // close, etc.</span></span>
+<span class="line"><span>#include</span><span> &lt;errno.h&gt;</span><span> // Get errorno</span></span></code></pre>
+<ol>
+    <li>Create the socket and get its file descriptor.</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>/* 1. Create socket */</span></span>
+<span class="line"><span>int</span><span> sockfd </span><span>=</span><span> socket</span><span>(AF_INET, SOCK_STREAM, </span><span>0</span><span>);</span></span>
+<span class="line"><span>                 // use IPv4  use TCP</span></span></code></pre>
+<p><code>AF_INET</code><span>&nbsp;</span>specifies to use IPv4 and<span>&nbsp;</span><code>SOCK_STREAM</code><span>&nbsp;</span>specifies to use TCP.</p>
+<ol start="2">
+    <li>Create the server address to connect to the server.</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>/* 2. Construct our address */</span></span>
+<span class="line"><span>struct</span><span> sockaddr_in serveraddr;</span></span>
+<span class="line"><span>serveraddr.sin_family </span><span>=</span><span> AF_INET;</span><span> // use IPv4</span></span>
+<span class="line"><span>serveraddr.sin_addr.s_addr </span><span>=</span><span> inet_addr</span><span>(</span><span>"127.0.0.1"</span><span>);</span></span>
+<span class="line"><span>// Set receiving port</span></span>
+<span class="line"><span>int</span><span> PORT </span><span>=</span><span> 8080</span><span>;</span></span>
+<span class="line"><span>serveraddr.sin_port </span><span>=</span><span> htons</span><span>(PORT);</span><span> // Big endian</span></span></code></pre>
+<p>Networking is always done in big-endian format, so<span>&nbsp;</span><code>htons</code><span>&nbsp;</span>is required to change the byte ordering from host to network.</p>
+<ol start="3">
+    <li>Attempt to connect to the server. This is the first, second, and third steps of the three way handshake.</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>int</span><span> did_connect </span><span>=</span><span> connect</span><span>(sockfd, (</span><span>struct</span><span> sockaddr</span><span>*</span><span>) </span><span>&amp;</span><span>serveraddr</span><span>, </span></span>
+<span class="line"><span>                       // socket   server info</span></span>
+<span class="line"><span>                          sizeof</span><span>(serveraddr));</span></span>
+<span class="line"><span>// Error if did_connect &lt; 0 :(</span></span>
+<span class="line"><span>if</span><span> (did_connect </span><span>&lt;</span><span> 0</span><span>) </span><span>return</span><span> errno;</span></span></code></pre>
+<ol start="4">
+    <li>Send a message to the server (place the message in some buffer, let&rsquo;s say<span>&nbsp;</span><code>client_buf</code>). Feel free to put these steps in a loop to keep the TCP connection alive.</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>/* 3. Send data to server */</span></span>
+<span class="line"><span>char</span><span> client_buf</span><span>[]</span><span> =</span><span> "Hello world!"</span><span>;</span></span>
+<span class="line"><span>int</span><span> did_send </span><span>=</span><span> send</span><span>(sockfd, client_buf, </span><span>strlen</span><span>(client_buf), </span><span>0</span><span>);</span></span>
+<span class="line"><span>                 // socket  send data   how much to send  flags</span></span>
+<span class="line"><span>// Error if did_send &lt; 0 :(</span></span>
+<span class="line"><span>if</span><span> (did_send </span><span>&lt;</span><span> 0</span><span>) </span><span>return</span><span> errno;</span></span></code></pre>
+<ol start="5">
+    <li>Create a buffer to store messages from the server.</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>/* 4. Create buffer to store incoming data */</span></span>
+<span class="line"><span>int</span><span> BUF_SIZE </span><span>=</span><span> 1024</span><span>;</span></span>
+<span class="line"><span>char</span><span> server_buf</span><span>[BUF_SIZE];</span></span></code></pre>
+<ol start="6">
+    <li>Listen to messages from server. Feel free to put these steps in a loop to create an ever-listening client.</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>/* 6. Listen for response from server */</span></span>
+<span class="line"><span>int</span><span> bytes_recvd </span><span>=</span><span> recv</span><span>(sockfd, server_buf, BUF_SIZE, </span><span>0</span><span>);</span></span>
+<span class="line"><span>                    // socket  store data  how much  flags</span></span>
+<span class="line"><span>// Execution will stop here until `BUF_SIZE` is read or termination/error</span></span>
+<span class="line"><span>// Error if bytes_recvd &lt; 0 :(</span></span>
+<span class="line"><span>if</span><span> (bytes_recvd </span><span>&lt;</span><span> 0</span><span>) </span><span>return</span><span> errno;</span></span></code></pre>
+<ol start="7">
+    <li>On interrupt (or on any exit), close the server.</li>
+</ol>
+<pre class="astro-code github-dark" data-language="c"><code><span class="line"><span>/* 8. You're done! Terminate the connection */</span></span>
+<span class="line"><span>close</span><span>(sockfd);</span></span></code></pre>
